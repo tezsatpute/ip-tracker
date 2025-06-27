@@ -7,6 +7,7 @@ const path = require('path');
 const app = express();
 const port = process.env.PORT || 3000;
 
+app.use('/captures',express.static('captures'));
 app.use(express.json({ limit: '5mb' }));
 app.use(express.static('public'));
 
@@ -49,7 +50,7 @@ app.post('/upload-image', (req, res) => {
   fs.mkdirSync('captures', { recursive: true });
 
   fs.writeFileSync(filePath, base64.replace(/^data:image\/png;base64,/, ''), 'base64');
-  console.log(`Image saved: ${filePath}`);
+  console.log(`Image saved: https://your-app.onrender.com/${filePath}`);
   res.sendStatus(200);
 });
 
