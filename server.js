@@ -4,21 +4,23 @@ const axios = require('axios');
 const app = express();
 const port = process.env.PORT || 3000;
 
-// Route to track visitor IP and location
+function getClientIp(req) {
+  const forwarded = req.headers['x-forwarded-for'];
+  return forwarded ? forwarded.split(',')[0] : req.socket.remoteAddress;
+}
+
 app.get('/visit', async (req, res) => {
-  // Get the real IP, considering proxy headers (used by Render)
-  const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
-  console.log('Visitor IP: ${ip}');
+  const ip = getClientIp(req);
+  console.log(`'Resolved client IP: ${ip}`);
+
+  const lookupIp = (!ip || ip === '::1' || ip === '127.0.0.1') ? '8.8.8.8' : ip;
 
   try {
-    // Fetch geolocation data from ipapi.co
-    const response = await axios.get('https://ipapi.co/${ip}/json/');
+    const response = await axios.get(`https://ipapi.co/${lookupIp}/json/`);
     const geo = response.data;
 
-    // Log geolocation data
     console.log("Geo Data:", geo);
 
-    // Respond with IP and location info
     res.send(`
       <h1>IP Tracker</h1>
       <p><strong>IP:</strong> ${ip}</p>
@@ -29,16 +31,14 @@ app.get('/visit', async (req, res) => {
     `);
   } catch (error) {
     console.error('Error fetching geolocation:', error.message);
-    res.send('<p>Your IP is ${ip}, but geolocation lookup failed.</p>');
+    res.send(`<p>Your IP is ${ip}, but geolocation lookup failed (404).</p>`);
   }
 });
 
-// Root route for quick status check
 app.get('/', (req, res) => {
-  res.send('<h1>Welcome to the IP Tracker App</h1><p>Visit <a href="/visit">/visit</a> to track your IP.</p>');
+  res.send(`<h1>Welcome to the IP Tracker</h1><p>Visit <a href="/visit">/visit</a> to check your IP and location.</p>`);
 });
 
-// Start the server
 app.listen(port, () => {
-  console.log('Server running on port ${port}');
+  console.log(`Server running on port ${port}`);
 });
