@@ -7,7 +7,7 @@ app.get('/visit', async (req, res) => {
   const ip =
     req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
 
-  console.log([${new Date().toISOString()}] Visitor IP: ${ip});
+  console.log('Visitor IP: ${ip}');
 
   try {
     const geo = await axios.get(https://ipapi.co/${ip}/json/);
